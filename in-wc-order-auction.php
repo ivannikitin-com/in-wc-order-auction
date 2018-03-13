@@ -15,7 +15,7 @@ You should have received a copy of the GNU General Public License along with thi
 */
 defined( 'ABSPATH' ) or die( 'No script kiddies please!' );
 
-define( 'INWCOA', 'in-wc-order-auction' );	// Константа текстового домена плагина
+define( 'INWCOA', 'in_wc_order_auction' );	// Константа текстового домена и других параметов плагина 
 
 // Основной класс плагина
 class INWCOA_Plugin
@@ -81,9 +81,16 @@ class INWCOA_Plugin
 		// Локализация
 		load_plugin_textdomain( INWCOA, false, basename( dirname( __FILE__ ) ) . '/lang' );
 	}
+
+	/**
+	 * Объект интеграции с WooOcommerce
+	 * @var INWCOA_WooCommerce
+	 */
+	public $wc;
 	
 	/**
 	 * Массив модулей отправки
+	 * @var mixed INWCOA__Sender
 	 */
 	public $senders;
 	
@@ -92,6 +99,16 @@ class INWCOA_Plugin
 	 */
 	public function init()
 	{
+		// Проверка наличия WC		
+		if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) ) 
+		{
+			add_action( 'admin_notices', array( $this, 'showNoticeNoWC' ) );
+			return;
+		}		
+		
+		// Инициализация объекта интеграции с WooCommerce
+		$this->wc = new INWCOA_WooCommerce( $this );
+		
 		// Загрузка модулей отправки
 		foreach ( glob( $this->path . 'inc/senders/*.php' ) as $fileName ) 
 		{
@@ -100,7 +117,18 @@ class INWCOA_Plugin
 			$this->senders[] = new $className( $this );
 		}
 		
-	}	
+	}
+	
+	/**
+	 * Предупреждение об отсутствии WooCommerce
+	 */
+	public function showNoticeNoWC()
+	{ ?>
+    <div class="notice notice-warning no-woocommerce">
+        <p><?php _e( 'Для работы плагина "Аукцион заказов WooCommerce" требуется установить и активировать плагин WooCommerce.', INWCOA ); ?></p>
+        <p><?php _e( 'В настоящий момент все функции плагина деактивированы.', INWCOA ); ?></p>
+    </div>		
+<?php }
 	
 }
 
