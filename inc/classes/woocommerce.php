@@ -6,24 +6,6 @@
 class INWCOA_WooCommerce extends INWCOA__Base
 {
 	/**
-	 * Параметр Количество оповещений каждого из сотрудников
-	 * @var int
-	 */ 
-	public $maxNotifications;
-	
-	/**
-	 * Параметр Время повтора оповещения
-	 * @var int
-	 */ 
-	public $repeatAfter;
-	
-	/**
-	 * Параметр Текст уведомленния
-	 * @var string
-	 */ 
-	public $notificationText;	
-	
-	/**
 	 * Конструктор 
 	 * @param INWCOA_Plugin $plugin Экземпляр основного класса плагина
 	 */
@@ -33,15 +15,10 @@ class INWCOA_WooCommerce extends INWCOA__Base
 		parent::__construct( $plugin );
 		
 		// Хуки
-		add_filter( 'woocommerce_settings_tabs_array', array( $this, 'addSettingsTab') );		// Добавляет новую страницу в настройки WC
+		add_filter( 'woocommerce_settings_tabs_array', array( $this, 'addSettingsTab'), 50 );	// Добавляет новую страницу в настройки WC
 		add_action( 'woocommerce_settings_tabs_'. INWCOA , array( $this, 'showSettings') );		// Показывает настройки на новой панели
 		add_action( 'woocommerce_update_options_'. INWCOA , array( $this, 'updateSettings') );	// Обновляет настройки на новой панели
-		
-		// Параметры
-		$this->maxNotifications = (int) get_option( INWCOA . '_max_notifications', 1 );
-		$this->repeatAfter = (int) get_option( INWCOA . '_repeat_after', 5 );
-		$this->notificationText = get_option( INWCOA . '_notification_text', __( 'Новый заказ %order_id%. Заказчик: %customer_name%', INWCOA ) );
-		
+		add_action( 'woocommerce_order_status_on-hold', array( $this, 'processOrder') );		// Обрабатывает заказ on-hold
 	}
 	
 	/**
@@ -112,6 +89,19 @@ class INWCOA_WooCommerce extends INWCOA__Base
 				 'id' => INWCOA . '_section_end'
 			)
 		);
+	}
+	
+	/**
+	 * Обрабатывает заказ
+	 * @param int $orderId Номер заказа 
+	 */
+	public function processOrder( $orderId )
+	{	
+		$order = new WC_Order( $orderId );
+		if ( ! $order )
+			return;
+		
+		
 	}
 	
 }

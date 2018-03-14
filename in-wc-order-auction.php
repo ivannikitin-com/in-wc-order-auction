@@ -47,6 +47,9 @@ class INWCOA_Plugin
 		
 		// Автозагрузка классов
 		spl_autoload_register( array( $this, 'autoload' ) );
+
+		// Активация плагина
+		register_activation_hook( __FILE__, 'INWCOA_User::registerRoles' );		
 		
 		// Хуки
 		add_action( 'plugins_loaded', array( $this, 'plugins_loaded' ) );
@@ -89,6 +92,12 @@ class INWCOA_Plugin
 	public $wc;
 	
 	/**
+	 * Объект работы с пользователями
+	 * @var INWCOA_User
+	 */
+	public $user;	
+	
+	/**
 	 * Массив модулей отправки
 	 * @var mixed INWCOA__Sender
 	 */
@@ -108,6 +117,9 @@ class INWCOA_Plugin
 		
 		// Инициализация объекта интеграции с WooCommerce
 		$this->wc = new INWCOA_WooCommerce( $this );
+		
+		// Инициализация объекта работы с пользователями
+		$this->user = new INWCOA_User( $this );
 		
 		// Загрузка модулей отправки
 		foreach ( glob( $this->path . 'inc/senders/*.php' ) as $fileName ) 
