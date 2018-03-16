@@ -102,4 +102,59 @@ class INWCOA__Sender extends INWCOA__Base
 		);		
 	}
 	
+	/**
+	 * ПОдготавливает сообщение по указанному шаблонку 
+	 * @param WP_User	$user		Получаль сообщения
+	 * @param WC_Order	$order		Заказ
+	 * @param string	$template	Шаблон сообщения
+	 * @return string	Подготовленный текст сообщения 
+	 */
+	public function prepare( $user, $order, $template )
+	{
+		if ( empty( $template ) )
+			return false;	// Сообщение пустое!
+		
+		// Получим все подстановки
+		$matches = array();		
+		if ( preg_match_all( '/%([0-9a-z_]+)%/', $template, $matches ) )
+		{
+			// Проходим по всем найденным кодам
+			foreach( $matches[0] as $code )
+			{
+				// Имя свойства
+				$property = str_replace( '%', '', $code );
+				
+				// Проверяем наличие такого свойства у объектов
+				if ( property_exists( $order, $property ) )
+				{
+					// Свойство WC_Order
+					$template = str_replace( $code, $order->$property, $template );
+					continue;
+				}
+				elseif ( $user->has_prop( $property ) )
+				{
+					// Свойство WP_User
+					$template = str_replace( $code, $user->$property, $template );
+					continue;
+				}
+			}
+		}
+		
+		return $template;
+	}
+	
+	
+	/**
+	 * Отправляет сообщение указанному пользователю 
+	 * @param WP_User	$user		Получаль сообщения
+	 * @param WC_Order	$order		Заказ
+	 * @param string	$template	Шаблон сообщения
+	 * @return bool 
+	 */
+	public function send( $user, $order, $template )
+	{
+		// Этот метод должен быть перекрыт
+		return false; 
+	}
+		
 }
