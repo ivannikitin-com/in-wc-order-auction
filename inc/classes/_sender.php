@@ -125,10 +125,12 @@ class INWCOA__Sender extends INWCOA__Base
 				$property = str_replace( '%', '', $code );
 				
 				// Проверяем наличие такого свойства у объектов
-				if ( property_exists( $order, $property ) )
+				
+				if ( $order->meta_exists( $property ) )
 				{
 					// Свойство WC_Order
-					$template = str_replace( $code, $order->$property, $template );
+					$order_data = $order->get_data();
+					$template = str_replace( $code, $order_data[$property], $template );
 					continue;
 				}
 				elseif ( $user->has_prop( $property ) )
@@ -142,6 +144,24 @@ class INWCOA__Sender extends INWCOA__Base
 		
 		return $template;
 	}
+	
+	
+	/**
+	 * Записывает сообщение в комментарии к заказу 
+	 * @param WC_Order	$order		Заказ
+	 * @param string	$template	Шаблон сообщения
+	 * @return bool
+	 */
+	public function orderLog( $order, $message )
+	{
+		if ( empty( $message ) )
+			return false;	// Сообщение пустое!
+		
+		$message = $this->title . ': ' . $message;
+		
+		return $order->add_order_note( $message );
+	}	
+	
 	
 	
 	/**

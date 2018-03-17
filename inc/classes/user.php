@@ -61,7 +61,7 @@ class INWCOA_User extends INWCOA__Base
 	 * Возвращает список исполнителей 
 	 * @return mixed WP_User
 	 */
-	public function getPerformers( )
+	public function getPerformers()
 	{
 		return get_users( array( 'role' => 'performer' ) );
 	}
@@ -70,7 +70,7 @@ class INWCOA_User extends INWCOA__Base
 	 * Возвращает список распорядителей 
 	 * @return mixed WP_User
 	 */
-	public function getSupervisors( )
+	public function getSupervisors()
 	{
 		return get_users( array( 'role' => 'supervisor' ) );
 	}

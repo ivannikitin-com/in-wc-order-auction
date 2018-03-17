@@ -19,6 +19,7 @@ class INWCOA_WooCommerce extends INWCOA__Base
 		add_action( 'woocommerce_settings_tabs_'. INWCOA , array( $this, 'showSettings') );		// Показывает настройки на новой панели
 		add_action( 'woocommerce_update_options_'. INWCOA , array( $this, 'updateSettings') );	// Обновляет настройки на новой панели
 		add_action( 'woocommerce_order_status_on-hold', array( $this, 'processOrder') );		// Обрабатывает заказ on-hold
+		add_action( 'woocommerce_order_status_processing', array( $this, 'processOrder') );		// Обрабатывает заказ on-hold
 	}
 	
 	/**
@@ -98,10 +99,73 @@ class INWCOA_WooCommerce extends INWCOA__Base
 	public function processOrder( $orderId )
 	{	
 		$order = new WC_Order( $orderId );
-		if ( ! $order )
-			return;
+		if ( ! $order ) return;
 		
+		//if ( WP_DEBUG ) $order->add_order_note( __( 'Аукцион заказка #', INWCOA ) . $order->ID );
 		
+		// Максимальное число оповещений пользователям
+		$maxNotifications = (int) get_option( INWCOA . '_max_notifications', 1 );
+		
+		// Число оповещенных исполнителей
+		$perfomersSendCount = 0;
+		
+		// Получим список исполнителей
+		$perfomers = $this->plugin->user->getPerformers();
+		
+		// Получим список оповещенных исполнителей из заказа
+		$orderMetaField = 'inwcoa_perfomer_notifications';
+		$performerNotifications = array();
+		foreach ( $order->meta_data as $orderMeta )
+		{
+			if ( $orderMeta->__isset( $orderMetaField ) )
+			{
+				$performerNotifications = $orderMeta->__get( $orderMetaField );
+				break;
+			}
+		}
+		
+		// Шаблон сообщения
+		$template = get_option( INWCOA . '_notification_text', 1 );		
+		
+		// Пройдем по каждому исполнителю
+		foreach( $perfomers as $performer )
+		{
+			// Посчитаем оповещение
+			$performerNotifications[ $performer->ID ]++;
+			if ( $performerNotifications[ $performer->ID ] <= $maxNotifications )
+			{
+				// Оповещаем его!
+				foreach( $this->plugin->senders as $sender )
+				{
+					$sender->send( $performer, $order, $template );
+					$perfomersSendCount++;
+				}
+			}
+		}
+
+		// Если никого оповестить не удалось, отправляем оповещение всем управляющим
+		if ( $perfomersSendCount == 0 )
+		{
+			$supervisors = $this->plugin->user->getSupervisors();
+			// Пройдем по каждому исполнителю
+			foreach( $perfomers as $supervisor )
+			{
+				// Посчитаем оповещение
+				$performerNotifications[ $supervisor->ID ]++;
+				if ( $performerNotifications[ $supervisor->ID ] <= $maxNotifications )
+				{
+					// Оповещаем его!
+					foreach( $this->plugin->senders as $sender )
+					{
+						$sender->send( $supervisor, $order, $template );
+					}
+				}
+			}
+		}
+		
+		// Сохраним счетчик оповещений
+		$order->update_meta_data( $orderMetaField, $performerNotifications );
+		$order->save();			
 	}
 	
 }
