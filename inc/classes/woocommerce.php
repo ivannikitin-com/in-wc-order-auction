@@ -112,6 +112,7 @@ class INWCOA_WooCommerce extends INWCOA__Base
 		// Получим список исполнителей
 		$perfomers = $this->plugin->user->getPerformers();
 		
+		// TODO: ПЕРЕПИСАТЬ РАБОТУ С МЕТОЙ
 		// Получим список оповещенных исполнителей из заказа
 		$orderMetaField = 'inwcoa_perfomer_notifications';
 		$performerNotifications = array();

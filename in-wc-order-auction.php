@@ -95,7 +95,13 @@ class INWCOA_Plugin
 	 * Объект работы с пользователями
 	 * @var INWCOA_User
 	 */
-	public $user;	
+	public $user;
+	
+	/**
+	 * Объект работы с заказами
+	 * @var INWCOA_User
+	 */
+	public $order;	
 	
 	/**
 	 * Массив модулей отправки
@@ -120,6 +126,9 @@ class INWCOA_Plugin
 		
 		// Инициализация объекта работы с пользователями
 		$this->user = new INWCOA_User( $this );
+		
+		// Инициализация объекта работы с заказами
+		$this->order = new INWCOA_Order( $this );		
 		
 		// Загрузка модулей отправки
 		foreach ( glob( $this->path . 'inc/senders/*.php' ) as $fileName ) 
