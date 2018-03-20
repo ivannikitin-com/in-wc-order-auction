@@ -14,9 +14,11 @@ class INWCOA_Order extends INWCOA__Base
 		parent::__construct( $plugin );
 		
 		// Хуки
-		add_action( 'admin_menu', array( $this, 'addAdminMenu') );								// Страница Нераспределенные заказы
-		add_action( 'add_meta_boxes_shop_order', array( $this, 'addMetabox') );					// Мета-бокс в заказе WooCOmmerce
-		add_filter( 'manage_shop_order_posts_columns', array( $this, 'addOrderColumns') );		// Добавляет колонки в таблицу заказов
+		add_action( 'admin_menu', array( $this, 'addAdminMenu') );									// Страница Нераспределенные заказы
+		add_action( 'add_meta_boxes_shop_order', array( $this, 'addMetabox') );						// Мета-бокс в заказе WooCOmmerce
+		add_action( 'save_post', array( $this, 'saveMetabox') );										// Сохранение метабокса
+		add_filter( 'manage_shop_order_posts_columns', array( $this, 'addOrderColumns'), 50, 1 );	// Добавляет колонки в таблицу заказов
+		add_filter( 'manage_shop_order_posts_custom_column', array( $this, 'showOrderColumns') );	// Добавляет колонки в таблицу заказов
 	}
 	
 	/**
@@ -180,16 +182,35 @@ class INWCOA_Order extends INWCOA__Base
 		if ( ! ( $order instanceof WC_Order ) )
 			$order = new WC_Order( $order );
 		
-		// ID исполнителя
-		$performerId = ( $performer instanceof WP_User ) ? $performerId->ID : (int) $performer;
-		
 		// Проеерка корректности
-		if ( ! $order || empty( $performerId ) )
+		if ( ! $order )
+			return false;		
+		
+		// Текущий исполнитель
+		$currentPerformer = $this->getPerformer( $order );
+		$currentPerformerId = ( $currentPerformer ) ? $currentPerformer->ID : 0;
+		
+		// Новый исполнитель
+		if ( ! empty( $performer ) && ! ( $performer instanceof WP_User ) )
+			$performer = new WP_User( $performer );
+		else
+			$performer = null;
+		
+		$performerId = ( $performer ) ? $performer->ID : 0;
+		
+		// Изменений не было
+		if ( $currentPerformerId == $performerId )
 			return false;
 		
 		// Сохранение мета-поля
 		$order->update_meta_data( self::META_PERFORMER, $performerId );
+		
+		if ( $performerId != 0 ) 
+			$order->add_order_note( __( 'Исполнитель', INWCOA ) . ': ' . $performer->display_name, false, true );
+		else
+			$order->add_order_note( __( 'Исполнитель не назначен', INWCOA ), false, true );
 		$order->save();
+		
 		return true;
 	}
 	
@@ -207,16 +228,39 @@ class INWCOA_Order extends INWCOA__Base
 	}
 	
 	/**
-	 * Добавляет мета-бокс в CRM
+	 * Добавляет мета-бокс в заказы
 	 * @param WP_Post $post		Запись (заказ), который сейчас показывается
 	 */
 	public function showMetabox( $post )
 	{
 		$performer = $this->getPerformer( $post->ID );
-		if ( $performer )
-			include( $this->plugin->path . 'inc/views/metabox-performer.php' );
-		else
-			esc_html_e( 'Исполнитель не назначен', INWCOA );
+		include( $this->plugin->path . 'inc/views/metabox-performer.php' );
+	}	
+	
+	/**
+	 * Сохраняет данные мета-бокса 
+	 * @param WP_Post $post		Запись (заказ), который сейчас показывается
+	 */
+	public function saveMetabox( $postId )
+	{
+		// Если это не наш тип записей, ничего не недаем
+		if ( $_POST['post_type'] != 'shop_order' ) 
+			return $postId;
+		
+		// Если это автосохранение, ничего не делаем
+		if ( defined('DOING_AUTOSAVE') && DOING_AUTOSAVE ) 
+			return $postId;
+
+		// Если неправильный nonce - это не наша форма, ничего не делаем
+		if ( ! wp_verify_nonce( $_POST['inwcoa-nonce'], INWCOA . '_metabox_save' ) )
+			return $postId;
+		
+		// Если текущий пользователь не имеет прав на назначение, ничего не делаем
+		if ( ! current_user_can( 'supervisor' ) && ! current_user_can( 'administrator' ) )
+			return $postId;
+				
+		$performerId = ( isset( $_POST['performer'] ) ) ? (int) $_POST['performer'] : 0;
+		$this->assignOrder( $postId, $performerId );
 	}	
 	
 	/**
@@ -225,7 +269,64 @@ class INWCOA_Order extends INWCOA__Base
 	 */
 	public function addOrderColumns( $columns )
 	{
-		$columns['inwcoa_performer'] = __( 'Исполнитель', INWCOA );
-		return $columns;
+		$show_columns                     = array();
+		$show_columns['cb']               = $columns['cb'];
+		$show_columns['order_number']     = __( 'Order', 'woocommerce' );
+		$show_columns['order_date']       = __( 'Date', 'woocommerce' );
+		$show_columns['order_status']     = __( 'Status', 'woocommerce' );
+		$show_columns['billing_address']  = __( 'Billing', 'woocommerce' );
+		$show_columns['shipping_address'] = __( 'Ship to', 'woocommerce' );
+		$show_columns['inwcoa_address']   = __( 'Адрес', INWCOA );
+		$show_columns['inwcoa_performer'] = __( 'Исполнитель', INWCOA );
+		$show_columns['order_total']      = __( 'Total', 'woocommerce' );
+		$show_columns['wc_actions']       = __( 'Actions', 'woocommerce' );
+		$show_columns = array_merge( $show_columns, $columns );
+		unset( $show_columns['billing_address'] );
+		unset( $show_columns['shipping_address'] );	
+		return $show_columns;
 	}
+	
+  /** 
+   * Output custom columns for coupons. 
+   * @param string $column 
+   */ 
+  public function showOrderColumns( $column ) 
+  { 
+      global $post, $the_order; 
+ 
+      if ( empty( $the_order ) || $the_order->get_id() !== $post->ID ) 
+	  { 
+          $the_order = wc_get_order( $post->ID ); 
+      } 
+	  
+      switch ( $column ) 
+	  { 
+          case 'inwcoa_performer' :
+			 $performer = $this->getPerformer( $the_order );
+			 if ( $performer )
+				  echo $performer->display_name;
+			 else
+				  echo '-';
+          	 break;
+
+		  case 'inwcoa_address' :
+              // Если указан адрес доставки, используем его
+			  if ( $address = $the_order->get_formatted_shipping_address() ) 
+                  echo '<a target="_blank" href="' . esc_url( $the_order->get_shipping_address_map_url() ) . '">' . esc_html( preg_replace( '#<br\s*/?>#i', ', ', $address ) ) . '</a>'; 
+			  else 
+			  { 
+				  // Если указан адрес заказчика, используем его
+				  if ( $address = $the_order->get_formatted_billing_address() ) 
+					  echo esc_html( preg_replace( '#<br\s*/?>#i', ', ', $address ) ); 
+				  else 
+					  echo '–';  
+              } 
+			  
+			  // Если есть телефон, покажем его
+              if ( $the_order->get_billing_phone() ) 
+                  echo '<small class="meta">' . __( 'Phone:', 'woocommerce' ) . ' ' . esc_html( $the_order->get_billing_phone() ) . '</small>';  			  
+			  
+          	break;			  
+	  }
+  }
 }
